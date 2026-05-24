@@ -1,4 +1,4 @@
-# 🚀 Zapbo Cred — WhatsApp Messaging Orchestrator
+# 🚀 Zapbo — WhatsApp Messaging Orchestrator
 
 ![Node.js](https://img.shields.io/badge/Node.js-18+-green)
 ![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
