@@ -1,8 +1,6 @@
 const prisma = require("../config/prisma.client");
 const { sendBailey, sendAdm } = require("../config/baileys.client");
-const fs = require("fs");
-const path = require("path");
-const { log } = require("console");
+
 
 class MessageService {
   constructor() {

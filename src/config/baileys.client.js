@@ -1,147 +1,117 @@
 const fs = require("fs");
-const path = require("path");
 const {
-  DisconnectReason,
-  useMultiFileAuthState,
   makeWASocket,
-  Browsers,
+  useMultiFileAuthState,
+  DisconnectReason,
 } = require("@whiskeysockets/baileys");
+const qrcode = require("qrcode-terminal")
+
 
 const AUTH_FOLDER = "auth_info_baileys";
 
-// Garante que a pasta de autenticação exista
-if (!fs.existsSync(path.resolve(AUTH_FOLDER))) {
-  fs.mkdirSync(path.resolve(AUTH_FOLDER), { recursive: true });
-  console.log("📂 Pasta de autenticação criada:", path.resolve(AUTH_FOLDER));
+let sock = null;
+let isConnected = false;
+let isConnecting = false;
+
+// Garante que a pasta exista
+if (!fs.existsSync(AUTH_FOLDER)) {
+  fs.mkdirSync(AUTH_FOLDER, { recursive: true });
 }
 
-// Variáveis globais
-let sock = null;
-let state = null;
-let saveCreds = null;
-let isConnected = false;
-let connecting = false; // evita chamadas paralelas
-
-// Função principal de conexão ao WhatsApp
 const connect = async () => {
-  if (connecting || isConnected) return;
-  connecting = true;
+  if (isConnecting) return;
+  isConnecting = true;
 
   try {
-    console.log("🔐 Carregando sessão de autenticação de:", path.resolve(AUTH_FOLDER));
-    const authState = await useMultiFileAuthState(AUTH_FOLDER);
-    state = authState.state;
-    saveCreds = authState.saveCreds;
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
 
     sock = makeWASocket({
       auth: state,
       printQRInTerminal: true,
-      browser: Browsers.windows("Desktop"),
+      browser: ["Kairos", "Chrome", "1.0.0"],
+      markOnlineOnConnect: true,
+      connectTimeoutMs: 60_000,
     });
 
-    // Evento: recebimento de mensagens
-    sock.ev.on("messages.upsert", async ({ messages }) => {
-      for (const msg of messages) {
-        if (msg.key.remoteJid === "status@broadcast") {
-          console.log("📢 Ignorando mensagem de Status...");
-          return;
-        }
-
-        // Tratar mensagens recebidas aqui
-      }
-    });
-
-    // Evento: atualização de conexão
-    sock.ev.on("connection.update", async (update) => {
-      const { connection, lastDisconnect } = update;
-
-      if (connection === "close") {
-        const errorCode = lastDisconnect?.error?.output?.statusCode;
-        console.log(`⚠️ Conexão fechada. Código: ${errorCode}`);
-
-        if (errorCode === DisconnectReason.loggedOut) {
-          console.log("🚨 Usuário deslogado. Fazendo backup e limpando autenticação...");
-
-          const backupPath = `${AUTH_FOLDER}_backup_${Date.now()}`;
-          try {
-            fs.cpSync(path.resolve(AUTH_FOLDER), backupPath, { recursive: true });
-            console.log(`🛟 Backup da sessão salvo em: ${backupPath}`);
-          } catch (e) {
-            console.error("❌ Erro ao fazer backup:", e.message || e);
-          }
-
-          fs.rmSync(path.resolve(AUTH_FOLDER), { recursive: true, force: true });
-          isConnected = false;
-          connecting = false;
-          setTimeout(connect, 3000);
-          return;
-        }
-
-        console.log("🔄 Tentando reconectar...");
-        isConnected = false;
-        connecting = false;
-        setTimeout(connect, 5000);
-      } else if (connection === "open") {
-        console.log("✅ Conexão estabelecida!");
-        console.log("📱 Número logado:", sock.user.id.split(":")[0]);
-        isConnected = true;
-        connecting = false;
-      }
-    });
-
-    // Evento: atualização de credenciais
-    sock.ev.on("creds.update", async () => {
-      await saveCreds();
+    sock.ev.on("creds.update", () => {
+      saveCreds();
       console.log("💾 Credenciais atualizadas.");
     });
 
+    sock.ev.on("connection.update", async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+      console.log("🔄 connection.update:", connection);
+
+      if (qr) {
+        console.log("📲 Escaneie este QR Code no seu WhatsApp:");
+        // O QR já aparece no terminal, esse log é só reforço
+        qrcode.generate(qr, { small: true });
+      }
+
+      if (connection === "open") {
+        isConnected = true;
+        isConnecting = false;
+        console.log("✅ Conectado ao WhatsApp!");
+      } else if (connection === "close") {
+        isConnected = false;
+        isConnecting = false;
+
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const reason = lastDisconnect?.error?.output?.payload?.reason || lastDisconnect?.error?.message;
+
+        console.log(`❌ Desconectado: código ${statusCode} - motivo: ${reason}`);
+
+        // Se for erro de sessão inválida ou logoff, limpa os arquivos de sessão para forçar novo login
+        if (
+          statusCode === DisconnectReason.loggedOut ||
+          statusCode === DisconnectReason.invalidSession ||
+          statusCode === DisconnectReason.restartRequired
+        ) {
+          console.log("🧹 Sessão inválida, removendo arquivos de autenticação...");
+          try {
+            fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+          } catch (err) {
+            console.error("Erro ao limpar sessão:", err);
+          }
+        }
+
+        // Tenta reconectar em 3 segundos
+        setTimeout(() => {
+          console.log("🔄 Tentando reconectar...");
+          connect();
+        }, 3000);
+      }
+    });
+
+    // Logs extras para debug
+    sock.ev.on("messages.upsert", (m) => {
+      console.log("📩 Mensagens recebidas:", JSON.stringify(m, null, 2));
+    });
+
   } catch (error) {
-    console.error("❌ Erro ao conectar:", error.message || error);
-    connecting = false;
+    console.error("⚠️ Erro na conexão:", error);
+    isConnecting = false;
+    // Tenta reconectar em 3 segundos
+    setTimeout(connect, 3000);
   }
 };
 
-// Aguarda conexão ativa
 const waitForConnection = async () => {
-  let attempts = 0;
-
   while (!isConnected) {
-    if (attempts >= 15) {
-      throw new Error("⏳ Tempo limite atingido para conexão!");
-    }
-
-    console.log("⏳ Aguardando conexão...");
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    attempts++;
+    console.log("⏳ Esperando conexão...");
+    await new Promise((res) => setTimeout(res, 2000));
   }
 };
 
-// Envia mensagem para um número específico
 const sendBailey = async (number, message) => {
-  if (!sock) throw new Error("🚫 Socket não inicializado.");
+  if (!sock) throw new Error("Socket não iniciado.");
   await waitForConnection();
-
-  try {
-    const jid = `55${number}@s.whatsapp.net`;
-    console.log(`📤 Enviando mensagem para ${number}...`);
-
-    await sock.sendMessage(jid, { text: message });
-
-    console.log(`✅ Mensagem enviada para ${number} às ${new Date().toLocaleTimeString()}`);
-  } catch (error) {
-    console.error("❌ Erro ao enviar mensagem:", error.message || error);
-    throw error;
-  }
+  const jid = `55${number}@s.whatsapp.net`;
+  await sock.sendMessage(jid, { text: message });
+  console.log(`✅ Mensagem enviada para ${number}`);
 };
 
-// Envia mensagem para o número do administrador
-const sendAdm = async (message) => {
-  await sendBailey(11992767398, message);
-};
-
-// Exporta as funções
 module.exports = {
   connect,
   sendBailey,
-  sendAdm,
 };
