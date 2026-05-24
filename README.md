@@ -1,88 +1,103 @@
-# WhatsApp Messaging Orchestrator
+# 🚀 Zapbo Cred — WhatsApp Messaging Orchestrator
 
-## Visão Geral
+![Node.js](https://img.shields.io/badge/Node.js-18+-green)
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-O `MessageService` é um serviço baseado em Node.js que automatiza o envio de mensagens via WhatsApp utilizando a biblioteca **Baileys**. Ele permite o gerenciamento de contatos, envio de mensagens em massa e gera relatórios diários sobre as mensagens enviadas.
+> Plataforma de automação de mensageria via WhatsApp orientada a dados.
 
-## Tecnologias Utilizadas
+---
 
-- **Node.js**: Ambiente de execução JavaScript
-- **Prisma**: ORM para manipulação do banco de dados
-- **Baileys**: Biblioteca para interação com o WhatsApp Web via socket
-- **SQLite/PostgreSQL** (dependendo da configuração do Prisma)
+## 🧠 Sobre o projeto
 
-## Configuração do Projeto
+O **WhatsApp-Messaging-Orchestrator** é um serviço backend desenvolvido em Node.js para automatizar o envio de mensagens via WhatsApp com base em dados armazenados em banco.
 
-### 1. Instalação das Dependências
+A aplicação permite gerenciar contatos, executar envios em massa e gerar relatórios automatizados, garantindo eficiência, controle e escalabilidade.
 
-Antes de rodar o projeto, instale as dependências:
+---
 
-```sh
+## ⚡ Problema que resolve
+
+Empresas que lidam com alto volume de clientes e cobranças enfrentam:
+
+- Processos manuais repetitivos  
+- Falta de controle de envio  
+- Baixa escalabilidade  
+- Perda de produtividade  
+
+O WhatsApp-Messaging-Orchestrator automatiza esse processo de ponta a ponta.
+
+---
+
+## 💡 Solução
+
+- Integra banco de dados ao WhatsApp  
+- Executa envios automáticos  
+- Controla fluxo de mensagens  
+- Gera relatórios de envio  
+- Escala comunicação sem esforço manual  
+
+---
+
+## 🚀 Funcionalidades
+
+- 📲 Envio automatizado de mensagens via WhatsApp  
+- 🧠 Disparo baseado em dados (data-driven)  
+- 👤 Cadastro e validação de usuários  
+- 📥 Importação de contatos via JSON  
+- 📤 Envio em massa com controle de intervalo  
+- 📊 Relatórios diários automatizados  
+- ⏱️ Controle de horário de envio  
+
+---
+
+## 🧱 Arquitetura
+src/
+├── controllers # Entrada das requisições
+├── services # Regras de negócio
+├── routes # Endpoints da API
+├── config # Configurações
+└── prisma # Banco de dados
+
+---
+
+## 🔄 Fluxo de funcionamento
+
+1. Dados são armazenados no banco  
+2. O sistema identifica condições de envio  
+3. Regras de negócio são executadas  
+4. As mensagens são enviadas automaticamente via WhatsApp  
+5. O status é atualizado no banco  
+
+---
+
+## 🛠️ Tecnologias utilizadas
+
+- Node.js  
+- Prisma ORM  
+- Baileys (WhatsApp Web API)  
+- SQLite / PostgreSQL  
+- Swagger (documentação de API)  
+
+---
+
+## 📦 Instalação
+
+```bash
+# Clone o repositório
+git clone https://github.com/mattosoguilherme/WhatsApp-Messaging-Orchestrator.git
+
+# Acesse o diretório
+cd WhatsApp-Messaging-Orchestrator
+
+# Instale as dependências
 npm install
-```
 
-### 2. Configuração do Banco de Dados
+# Configure o ambiente
+cp .env.example .env
 
-Edite o arquivo `.env` e configure a conexão com o banco de dados. Execute a migração para criar as tabelas:
-
-```sh
+# Execute as migrations
 npx prisma migrate dev
-```
 
-### 3. Inicialização do Servidor
-
-Para iniciar o serviço:
-
-```sh
-node index.js
-```
-
-## Funcionalidades
-
-### 1. Cadastro de Usuários (`create_user`)
-
-Cria um novo usuário com nome, CPF e telefones (principal e secundários). Antes do cadastro, verifica se o CPF e os telefones já estão cadastrados no banco de dados.
-
-```js
-await messageService.create_user({
-  nome: "João Silva",
-  cpf: 12345678900,
-  telefone_principal: 5511987654321,
-  telefones_secundarios: [5511912345678]
-});
-```
-
-### 2. Adição de Números a partir de um Arquivo JSON (`addNumber`)
-
-Esta função lê um arquivo JSON contendo uma lista de clientes e adiciona os números filtrados ao banco de dados. O arquivo deve estar localizado no diretório `c:/arkg.solutions/solutions/zapbo_fgts/temps/` e ser nomeado `dados_filtrados.json`. 
-
-O processo ocorre em lotes de 10 para otimizar a performance e evitar sobrecarga.
-
-```js
-await messageService.addNumber(5511987654321);
-```
-
-### 3. Envio de Mensagens em Massa (`sendToMany`)
-
-- Filtra os contatos que ainda não receberam mensagens
-- Verifica se está dentro do horário permitido (06h00 - 22h00)
-- Envia mensagens para cada contato
-- Atualiza o status no banco de dados
-- Aguarda 4 minutos entre cada envio
-
-### 4. Relatórios Diários (`generateDailyReport` e `endofdayreport`)
-
-Gera relatórios com o número total de mensagens enviadas no dia e envia um resumo para os administradores.
-
-```js
-await messageService.generateDailyReport(new Date());
-```
-
-## Agendamento de Mensagens
-
-O envio de mensagens ocorre de forma automatizada dentro do horário configurado. Caso esteja fora do horário, o sistema aguarda até o horário permitido para retomar os envios.
-
-## Conclusão
-
-Este projeto automatiza o envio de mensagens via WhatsApp, garantindo um processo eficiente e organizado. Caso precise de melhorias ou adaptações, basta modificar os métodos no `MessageService`.
-
+# Inicie o servidor
+npm run dev
